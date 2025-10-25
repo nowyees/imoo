@@ -30,6 +30,7 @@
   }
   .move { background-color: #4CAF50; color: white; }
   .stop { background-color: #f44336; color: white; }
+  #log-message { margin-top: 10px; font-size: 14px; color: #555; height: 16px; }
 </style>
 </head>
 <body>
@@ -37,12 +38,71 @@
   <p>제어 페이지: <a href="https://nowyees.github.io/imoo/" target="_blank">https://nowyees.github.io/imoo/</a></p>
   
   <script>
-    // 💡 ESP8266의 IP 주소를 192.168.0.114로 설정
+    // 💡 확인된 ESP8266의 IP 주소입니다.
     const esp_ip = "192.168.0.114"; 
+    
+    // 로그 메시지를 출력하는 헬퍼 함수
+    function logMessage(msg, isError = false) {
+        const log = document.getElementById('log-message');
+        log.style.color = isError ? '#f44336' : '#4CAF50';
+        log.innerText = msg;
+    }
+
+    // ESP8266으로 명령을 보내는 함수
+    async function sendControl(angle) {
+      const url = `http://${esp_ip}/control?angle=${angle}`;
+      logMessage("명령 전송 시도 중...");
+
+      try {
+          // fetch API를 사용하여 GET 요청을 보냄
+          const response = await fetch(url);
+
+          if (response.ok) {
+              // HTTP 상태 코드가 200-299일 때 성공 (ESP 코드가 200 OK를 보냄)
+              logMessage(`성공: ${angle}°로 이동 완료.`);
+              // 성공하면 UI 각도 즉시 업데이트
+              document.getElementById('angle-display').innerText = angle;
+              document.getElementById('angle-slider').value = angle;
+              document.getElementById('angle-value').innerText = angle;
+          } else {
+              // ESP에서 400 에러를 보낸 경우 (각도 유효성 문제 등)
+              logMessage(`오류: 서버 응답 ${response.status}.`, true);
+          }
+      } catch (error) {
+          // 네트워크 연결 자체에 문제가 있을 경우 (CORS, 방화벽 등)
+          logMessage(`심각한 네트워크 오류. (CORS/방화벽/Wi-Fi): ${error.message}`, true);
+      }
+    }
+
+    // ESP8266에서 현재 각도 상태를 가져와 표시하는 함수
+    async function fetchAngle() {
+      const status_url = `http://${esp_ip}/status`;
+      
+      try {
+          const response = await fetch(status_url);
+          const data = await response.text();
+          
+          if (response.ok) {
+              const angle = data.trim();
+              document.getElementById('angle-display').innerText = angle;
+              document.getElementById('angle-slider').value = angle;
+              document.getElementById('angle-value').innerText = angle;
+          } else {
+              document.getElementById('angle-display').innerText = "통신 실패";
+          }
+      } catch (error) {
+          document.getElementById('angle-display').innerText = "연결 오류";
+      }
+    }
+    
+    // 페이지 로드 후 1초마다 상태 업데이트
+    fetchAngle();
+    setInterval(fetchAngle, 1000); 
   </script>
 
   <div class="servo-control">
     <h2>서보 모터 (D3/GPIO0)</h2>
+    <div id="log-message">통신 대기 중...</div>
     <div class="status-display">현재 각도: <span id="angle-display">--</span>&deg;</div>
     
     <div class="range-container">
@@ -56,49 +116,5 @@
       <button class="stop" onclick="sendControl(90)">STOP (90&deg;)</button>
     </div>
   </div>
-  
-  <script>
-    // ESP8266으로 명령을 보내는 함수
-    function sendControl(angle) {
-      const url = `http://${esp_ip}/control?angle=${angle}`;
-      
-      fetch(url)
-        .then(response => {
-          if (response.ok) {
-            // 성공하면 UI 각도 즉시 업데이트
-            document.getElementById('angle-display').innerText = angle;
-            document.getElementById('angle-slider').value = angle;
-            document.getElementById('angle-value').innerText = angle;
-          } else {
-            alert('명령 전송 실패! ESP 연결 확인.');
-          }
-        })
-        .catch(error => {
-          document.getElementById('angle-display').innerText = "연결 오류";
-          alert('네트워크 오류: ESP8266 서버에 연결할 수 없습니다.');
-        });
-    }
-
-    // ESP8266에서 현재 각도 상태를 가져와 표시하는 함수
-    function fetchAngle() {
-      const status_url = `http://${esp_ip}/status`;
-      
-      fetch(status_url)
-        .then(response => response.text())
-        .then(data => {
-            const angle = data.trim();
-            document.getElementById('angle-display').innerText = angle;
-            document.getElementById('angle-slider').value = angle;
-            document.getElementById('angle-value').innerText = angle;
-        })
-        .catch(error => {
-            document.getElementById('angle-display').innerText = "연결 오류";
-        });
-    }
-    
-    // 1초마다 상태 업데이트
-    fetchAngle();
-    setInterval(fetchAngle, 1000); 
-  </script>
 </body>
 </html>
