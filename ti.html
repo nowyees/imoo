@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Remote Servo Control</title>
+<style>
+  body { font-family: Arial, sans-serif; text-align: center; margin-top: 50px; background-color: #f4f4f9; }
+  h1 { color: #333; }
+  .button {
+    border: none;
+    color: white;
+    padding: 15px 32px;
+    font-size: 16px;
+    margin: 10px;
+    cursor: pointer;
+    border-radius: 8px;
+    transition: background-color 0.3s;
+  }
+  .move { background-color: #4CAF50; }
+  .stop { background-color: #f44336; }
+  .current-status { margin-top: 30px; font-size: 24px; font-weight: bold; color: #007bff; }
+</style>
+</head>
+<body>
+  <h1>서보 모터 원격 제어</h1>
+  
+  <p class="current-status">현재 각도: <span id="angle-display">--</span>&deg;</p>
+  
+  <button class="button move" onclick="sendControl('50')">MOVE TO 50&deg;</button>
+  <button class="button stop" onclick="sendControl('90')">STOP (90&deg;)</button>
+  
+  <script>
+    // ⚠️ 이 부분을 ESP8266의 실제 할당된 IP 주소로 반드시 변경하세요!
+    const esp_ip = "YOUR_ESP_IP_ADDRESS"; 
+
+    // ESP8266으로 명령을 보내는 함수
+    function sendControl(angle) {
+      const url = `http://${esp_ip}/control?angle=${angle}`;
+      
+      fetch(url)
+        .then(response => {
+          if (response.ok) {
+            console.log(`Command sent: Move to ${angle} degrees`);
+            updateStatus(angle); // 성공하면 UI 즉시 업데이트
+          } else {
+            console.error('Failed to send command:', response.statusText);
+            alert('명령 전송 실패! IP 주소와 ESP 연결을 확인하세요.');
+          }
+        })
+        .catch(error => {
+          console.error('Network error:', error);
+          alert('네트워크 오류: ESP8266 서버에 연결할 수 없습니다.');
+        });
+    }
+
+    // 현재 각도 상태를 UI에 표시하는 함수
+    function updateStatus(angle) {
+      document.getElementById('angle-display').innerText = angle;
+    }
+    
+    // ESP8266에서 현재 각도를 가져와 표시하는 함수
+    function fetchAngle() {
+      const status_url = `http://${esp_ip}/status`;
+      
+      fetch(status_url)
+        .then(response => response.text())
+        .then(data => {
+            updateStatus(data);
+        })
+        .catch(error => {
+            document.getElementById('angle-display').innerText = "연결 오류";
+            console.error('Error fetching status:', error);
+        });
+    }
+    
+    // 페이지 로드 시 및 1초마다 상태 업데이트를 시도합니다.
+    fetchAngle();
+    setInterval(fetchAngle, 1000); 
+  </script>
+</body>
+</html>
